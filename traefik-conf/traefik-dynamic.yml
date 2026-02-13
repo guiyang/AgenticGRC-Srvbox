@@ -1,0 +1,190 @@
+# =============================================================================
+# Traefik Dynamic Configuration for Authentik
+# =============================================================================
+# This configuration demonstrates how to integrate Authentik with Traefik
+# as a reverse proxy using Traefik's dynamic configuration.
+#
+# Usage:
+# 1. Place this file in your Traefik dynamic configuration directory
+# 2. Update hostnames to match your domain
+# 3. Restart Traefik or wait for automatic reload
+#
+# For label-based configuration, see the example in docker-compose.override.yml.example
+# =============================================================================
+
+http:
+  # --------------------------------------------------------------------------
+  # Routers
+  # --------------------------------------------------------------------------
+
+  routers:
+    # Main Authentik router
+    authentik:
+      rule: "Host(`authentik.example.com`)"
+      entryPoints:
+        - websecure
+      service: authentik
+      middlewares:
+        - authentik-headers
+      tls:
+        certResolver: letsencrypt
+        # Enable for HSTS preload
+        # options:
+        #   mintls13: true
+
+    # Outpost router - handles outpost requests from any subdomain
+    authentik-outpost:
+      rule: "HostRegexp(`{subdomain:[a-z0-9-]+}.example.com`) && PathPrefix(`/outpost.goauthentik.io/`)"
+      entryPoints:
+        - websecure
+      service: authentik
+      middlewares:
+        - authentik-headers
+      tls:
+        certResolver: letsencrypt
+
+    # Optional: HTTP to HTTPS redirect
+    authentik-redirect:
+      rule: "Host(`authentik.example.com`)"
+      entryPoints:
+        - web
+      middlewares:
+        - https-redirect
+      service: authentik
+
+  # --------------------------------------------------------------------------
+  # Services
+  # --------------------------------------------------------------------------
+
+  services:
+    # Authentik backend service
+    authentik:
+      loadBalancer:
+        servers:
+          # Port 9000 is Authentik's HTTP port
+          - url: "http://authentik-server:9000"
+
+        # Health check
+        healthCheck:
+          path: /-/health/
+          interval: "10s"
+          timeout: "3s"
+
+        # Sticky sessions (required for WebSocket)
+        sticky:
+          cookie:
+            name: "authentik_sticky"
+            secure: true
+            httpOnly: true
+
+        # Connection settings
+        serversTransport: authentik-transport
+
+  # --------------------------------------------------------------------------
+  # Middlewares
+  # --------------------------------------------------------------------------
+
+  middlewares:
+    # Security headers for Authentik
+    authentik-headers:
+      headers:
+        # Security headers
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+          X-Forwarded-Host: "authentik.example.com"
+
+        customResponseHeaders:
+          # HSTS
+          Strict-Transport-Security: "max-age=63072000; includeSubDomains; preload"
+
+          # Content Security Policy (adjust based on your needs)
+          Content-Security-Policy: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self';"
+
+          # Other security headers
+          X-Content-Type-Options: "nosniff"
+          X-Frame-Options: "SAMEORIGIN"
+          X-XSS-Protection: "1; mode=block"
+          Referrer-Policy: "strict-origin-when-cross-origin"
+          Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+
+        # Remove server information
+        server: "Authentik"
+
+        # SSL redirect
+        sslRedirect: true
+
+        # Browser auto-completion
+        browserXssFilter: true
+        contentTypeNosniff: true
+        forceSTSHeader: true
+        frameDeny: true
+
+    # HTTPS redirect middleware
+    https-redirect:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    # Rate limiting (optional - adjust based on your needs)
+    authentik-ratelimit:
+      rateLimit:
+        average: 100
+        burst: 50
+        period: "1m"
+
+  # --------------------------------------------------------------------------
+  # Servers Transport
+  # --------------------------------------------------------------------------
+
+  serversTransports:
+    # Custom transport for Authentik connections
+    authentik-transport:
+      insecureSkipVerify: false
+      forwardingTimeouts:
+        dialTimeout: "30s"
+        responseHeaderTimeout: "60s"
+        idleConnTimeout: "90s"
+
+# =============================================================================
+# ForwardAuth Configuration
+# =============================================================================
+# The following configuration demonstrates how to use Authentik's ForwardAuth
+# feature to protect other services behind Traefik.
+
+# http:
+#   middlewares:
+#     # ForwardAuth middleware that sends requests to Authentik
+#     authentik-forwardauth:
+#       forwardAuth:
+#         address: "http://authentik-server:9000/outpost.goauthentik.io/auth/traefik"
+#         trustForwardHeader: true
+#         authResponseHeaders:
+#           - X-authentik-username
+#           - X-authentik-groups
+#           - X-authentik-email
+#           - X-authentik-name
+#           - X-authentik-uid
+#           - X-authentik-jwt
+#           - X-authentik-meta-jwks
+#           - X-authentik-meta-outpost
+#           - X-authentik-meta-provider
+#           - X-authentik-meta-app
+#           - X-authentik-meta-version
+
+# =============================================================================
+# Labels-based Configuration Alternative
+# =============================================================================
+# If you prefer to use labels instead of dynamic configuration, add these
+# labels to your Authentik server service in docker-compose.yml:
+#
+# labels:
+#   - "traefik.enable=true"
+#   - "traefik.http.routers.authentik.rule=Host(`authentik.example.com`)"
+#   - "traefik.http.routers.authentik.entrypoints=websecure"
+#   - "traefik.http.routers.authentik.service=authentik"
+#   - "traefik.http.routers.authentik.tls.certresolver=letsencrypt"
+#   - "traefik.http.services.authentik.loadbalancer.server.port=9000"
+#   - "traefik.http.routers.authentik-outpost.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.example.com`) && PathPrefix(`/outpost.goauthentik.io/`)"
+#   - "traefik.http.routers.authentik-outpost.entrypoints=websecure"
+#   - "traefik.http.routers.authentik-outpost.tls.certresolver=letsencrypt"
+#   - "traefik.http.routers.authentik-outpost.service=authentik"

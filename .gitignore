@@ -1,0 +1,81 @@
+# =============================================================================
+# Authentik Docker Compose - Git Ignore File
+# =============================================================================
+# This file ensures sensitive data and generated files are not committed
+# to version control.
+# =============================================================================
+
+# Environment configuration (contains sensitive data)
+.env
+
+# Authentik data directories (contains user data and media)
+/media/
+/geoip/
+
+# Custom templates (may contain sensitive logic)
+/custom-templates/
+
+# Certificate files
+/certs/
+# Keep directory structure
+!certs/.gitkeep
+!certs/*.example
+!certs/README.md
+
+# PostgreSQL data (if using named volumes, this directory won't exist)
+/database/
+pg_data/
+
+# Docker socket (referenced in compose, but should not be in repo)
+/docker.sock
+
+# Backup files
+*.bak
+*.backup
+*.sql
+*.sql.gz
+
+# Log files
+*.log
+/logs/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker override files (may contain environment-specific settings)
+docker-compose.override.yml
+docker-compose.override.yml.example
+docker-compose.*.yml
+!docker-compose.yml
+!docker-compose.socket-proxy.yml
+
+# Nginx and Traefik configuration directories
+/nginx-conf/*.pem
+/nginx-conf/*.key
+/nginx-conf/*.crt
+/traefik-conf/acme.json
+
+# Ansible or other deployment tools
+*.retry
+.vault_pass

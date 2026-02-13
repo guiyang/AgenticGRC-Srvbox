@@ -1,0 +1,197 @@
+# =============================================================================
+# Docker Socket Proxy for Authentik
+# =============================================================================
+# This configuration provides an additional layer of security when Authentik
+# needs to access the Docker socket for outpost management.
+#
+# The Docker Socket Proxy (based on Tecnativa Docker Socket Proxy) creates
+# a filtered API gateway that limits what Authentik can do with Docker.
+#
+# IMPORTANT: This is an OPTIONAL configuration for enhanced security.
+# Use this if you want to keep outpost functionality but reduce Docker socket risks.
+#
+# References:
+# - https://github.com/Tecnativa/docker-socket-proxy
+# - https://docs.goauthentik.io/docs/install-config/install/docker-compose/#docker-socket
+# =============================================================================
+
+services:
+  # Docker Socket Proxy
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: authentik-socket-proxy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    privileged: true
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:2375/_ping || exit 1"]
+      start_period: 10s
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      # Read-only access to Docker socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # ========================================
+      # CONTAINER PERMISSIONS
+      # ========================================
+      # Allow listing containers
+      CONTAINERS: 1
+
+      # Allow creating containers (required for outpost deployment)
+      CREATE: 1
+
+      # Allow starting/stopping containers
+      START: 1
+      STOP: 1
+      RESTART: 1
+
+      # Allow removing containers
+      RM: 1
+
+      # Allow inspecting containers
+      INSPECT: 1
+
+      # Allow reading container logs
+      LOGS: 1
+
+      # ========================================
+      # IMAGE PERMISSIONS
+      # ========================================
+      # Allow pulling images (required for outpost deployment)
+      IMAGES: 1
+
+      # ========================================
+      # NETWORK PERMISSIONS
+      # ========================================
+      # Allow listing networks
+      NETWORKS: 1
+
+      # Allow creating networks
+      CREATE_NETWORKS: 1
+
+      # Allow connecting/disconnecting from networks
+      CONNECT: 1
+      DISCONNECT: 1
+
+      # ========================================
+      # VOLUME PERMISSIONS
+      # ========================================
+      # Allow listing volumes (required for outpost)
+      VOLUMES: 1
+
+      # Allow creating volumes
+      CREATE_VOLUMES: 1
+
+      # ========================================
+      # SYSTEM PERMISSIONS
+      # ========================================
+      # Allow reading Docker events
+      EVENTS: 1
+
+      # Allow system info
+      INFO: 1
+
+      # Allow version info
+      VERSION: 1
+
+      # ========================================
+      # DENIED PERMISSIONS (Explicitly disabled)
+      # ========================================
+      # Disable exec (prevent running arbitrary commands in containers)
+      EXEC: 0
+
+      # Disable attach (prevent attaching to container stdin/stdout)
+      ATTACH: 0
+
+      # Disable commit (prevent creating images from containers)
+      COMMIT: 0
+
+      # Disable container top (prevent viewing container processes)
+      TOP: 0
+
+      # Disable wait (prevent blocking on container operations)
+      WAIT: 0
+
+      # ========================================
+      # SWARM PERMISSIONS (Disabled by default)
+      # ========================================
+      # Swarm-related permissions are not needed for outpost management
+      SWARM: 0
+      SERVICES: 0
+      TASKS: 0
+      NODES: 0
+
+      # ========================================
+      # CONFIG PERMISSIONS (Disabled by default)
+      # ========================================
+      # Configs are not needed for outpost management
+      CONFIGS: 0
+      SECRETS: 0
+
+    networks:
+      - authentik-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+
+# =============================================================================
+# USAGE INSTRUCTIONS
+# =============================================================================
+#
+# 1. Start the socket proxy service:
+#    docker compose -f docker-compose.socket-proxy.yml up -d socket-proxy
+#
+# 2. Modify the main docker-compose.yml worker service:
+#    - Remove: /var/run/docker.sock:/var/run/docker.sock:ro
+#    - Add environment variable: DOCKER_HOST: tcp://socket-proxy:2375
+#    - Add dependency: socket-proxy (with healthcheck condition)
+#
+# 3. Example worker service modification:
+#    worker:
+#      ...
+#      depends_on:
+#        postgresql:
+#          condition: service_healthy
+#        redis:
+#          condition: service_healthy
+#        socket-proxy:
+#          condition: service_healthy
+#      environment:
+#        ...
+#        DOCKER_HOST: tcp://socket-proxy:2375
+#      volumes:
+#        - ./media:/media
+#        - ./certs:/certs
+#        - ./custom-templates:/templates
+#        # Remove: - /var/run/docker.sock:/var/run/docker.sock:ro
+#
+# 4. Restart the worker:
+#    docker compose up -d worker
+#
+# =============================================================================
+# SECURITY CONSIDERATIONS
+# =============================================================================
+#
+# The Docker Socket Proxy provides the following security benefits:
+#
+# 1. **Filtered API Access**: Only specific Docker API endpoints are accessible
+# 2. **No Shell Access**: Cannot execute arbitrary commands in containers (EXEC: 0)
+# 3. **Explicit Permissions**: Each Docker operation must be explicitly enabled
+# 4. **Audit Trail**: All proxied requests can be logged
+# 5. **Resource Isolation**: Proxy runs in its own container with resource limits
+#
+# Recommendations:
+# - Run the proxy with minimal required permissions (remove any unused)
+# - Monitor proxy logs for suspicious activity
+# - Keep the proxy image updated
+# - Consider using network policies to restrict access further
+#
+# =============================================================================
