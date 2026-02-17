@@ -5,8 +5,10 @@
 # to version control.
 # =============================================================================
 
-# Environment configuration (contains sensitive data)
+# Environment and Secrets
 .env
+.secrets
+*.env.backup
 
 # Authentik data directories (contains user data and media)
 /media/
@@ -22,6 +24,10 @@
 !certs/*.example
 !certs/README.md
 
+# Certificate installer archives
+cert-installers/*.tar.gz
+cert-installers/*.zip
+
 # PostgreSQL data (if using named volumes, this directory won't exist)
 /database/
 pg_data/
@@ -34,6 +40,11 @@ pg_data/
 *.backup
 *.sql
 *.sql.gz
+*.tar.gz
+/backups/
+
+# Generated documentation
+DEPLOYMENT_GUIDE.md
 
 # Log files
 *.log

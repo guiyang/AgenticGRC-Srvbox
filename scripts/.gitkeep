@@ -1,0 +1,17 @@
+# AgenticGRC-Srvbox Scripts
+
+This directory contains initialization and management scripts for the AgenticGRC-Srvbox project.
+
+## Available Scripts
+
+- `init-all.sh` - Complete initialization script (generates keys, certificates, configs)
+- `quick-init.sh` - Interactive quick initialization wizard (recommended)
+- `README.md` - This file (detailed documentation)
+
+## Quick Start
+
+```bash
+./scripts/quick-init.sh
+```
+
+For detailed documentation, see [README.md](README.md).
